@@ -1,0 +1,51 @@
+services:
+  app:
+    build:
+      context: ./demo
+      dockerfile: Dockerfile
+    container_name: metamorph-demo-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: ${PORT:-8080}
+      DB_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-metamorph_db}
+      MYSQL_USER: ${MYSQL_USER:-metamorph_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metamorph_password}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - metamorph-network
+
+  mysql:
+    image: mysql:8.4
+    container_name: metamorph-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-metamorph_db}
+      MYSQL_USER: ${MYSQL_USER:-metamorph_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metamorph_password}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - metamorph-network
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  metamorph-network:
+    driver: bridge
