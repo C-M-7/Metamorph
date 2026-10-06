@@ -43,7 +43,43 @@ To run only MySQL in Docker and run the Spring Boot app directly from your IDE o
 # Start MySQL only
 docker compose up -d mysql
 
-# Run the Spring Boot application
+# Run the Spring Boot application (Windows)
 cd demo
-./mvnw spring-boot:run
+.\mvnw.cmd spring-boot:run
+```
+
+## Database Migrations (Flyway)
+
+Flyway handles database schema versioning automatically on application startup.
+
+### File Location & Naming
+- Directory: `demo/src/main/resources/db/migration/`
+- Naming convention: `V<version>__<description>.sql` (e.g., `V1__create_test_connection_table.sql`)
+
+### Applying Migrations
+- **Docker**: Rebuild and restart the container whenever new migration scripts are added:
+  ```bash
+  docker compose up --build -d
+  ```
+- **Local**: Simply restart the Spring Boot app (`.\mvnw.cmd spring-boot:run`).
+
+### Inspecting Database & Migrations
+Connect to the running MySQL container:
+```bash
+docker exec -it metamorph-mysql mysql -u metamorph_user -pmetamorph_password -D metamorph_db
+```
+Useful verification queries:
+```sql
+-- Check migration status and history
+SELECT * FROM flyway_schema_history;
+
+-- List created tables
+SHOW TABLES;
+```
+
+### Resetting Migration State
+To clear database state and re-run all migrations from scratch:
+```bash
+docker compose down -v
+docker compose up --build -d
 ```
