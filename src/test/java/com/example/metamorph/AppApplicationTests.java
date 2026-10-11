@@ -1,10 +1,10 @@
-package com.example.metamorph.demo;
+package com.example.metamorph;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class DemoApplicationTests {
+class MetamorphApplicationTests {
 
 	@Test
 	void contextLoads() {
