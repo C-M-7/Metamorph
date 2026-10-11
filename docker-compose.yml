@@ -43,7 +43,7 @@ services:
     container_name: metamorph-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-metamorph_db}
       MYSQL_USER: ${MYSQL_USER:-metamorph_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metamorph_password}
