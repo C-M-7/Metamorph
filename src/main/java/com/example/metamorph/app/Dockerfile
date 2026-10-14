@@ -35,7 +35,7 @@ EXPOSE 8080
 # PropertiesLauncher lets us pick AppApplication as the main class
 # without changing the JAR — worker uses the same JAR with WorkerApplication
 ENTRYPOINT ["java", \
-  "-Dloader.main=com.example.metamorph.app.AppApplication", \
+  "-Dloader.main=com.example.metamorph.AppApplication", \
   "-Dspring.profiles.active=app", \
   "-cp", "app.jar", \
   "org.springframework.boot.loader.launch.PropertiesLauncher"]

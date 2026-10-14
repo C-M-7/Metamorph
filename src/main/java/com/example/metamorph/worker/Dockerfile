@@ -36,7 +36,7 @@ COPY --from=builder --chown=spring:spring /workspace/target/*.jar app.jar
 # PropertiesLauncher lets us pick WorkerApplication as the main class
 # without changing the JAR — app uses the same JAR with AppApplication
 ENTRYPOINT ["java", \
-  "-Dloader.main=com.example.metamorph.worker.WorkerApplication", \
+  "-Dloader.main=com.example.metamorph.WorkerApplication", \
   "-Dspring.profiles.active=worker", \
   "-cp", "app.jar", \
   "org.springframework.boot.loader.launch.PropertiesLauncher"]
