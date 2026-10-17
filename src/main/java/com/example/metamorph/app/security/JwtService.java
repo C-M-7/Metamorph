@@ -53,12 +53,13 @@ public class JwtService {
                    .compact();
     }
 
-    // Generates a signed short-lived access token containing user ID and email
+    // Generates a signed short-lived access token containing user ID, email, and role
     public String generateAccessToken(User user) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(String.valueOf(user.getId()))
                 .claim("email", user.getEmail())
+                .claim("role", user.getRole().name())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + accessExpiryMs))
                 .signWith(accessKey)
