@@ -1,0 +1,559 @@
+{
+	"info": {
+		"_postman_id": "b3e0c7a1-8d45-4df2-9b62-7fa3458ef110",
+		"name": "Metamorph - JWT Authentication & Authorization",
+		"description": "Comprehensive Postman test collection for testing Metamorph's stateless JWT authentication, refresh token cookie rotation, user registration, and protected endpoint authorization.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Authentication Flows",
+			"item": [
+				{
+					"name": "1.1 Register New User",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Generate random email if none provided or keep standard test email",
+									"if (!pm.collectionVariables.get(\"testEmail\")) {",
+									"    const randomStr = Math.random().toString(36).substring(7);",
+									"    pm.collectionVariables.set(\"testEmail\", `user_${randomStr}@example.com`);",
+									"}"
+								]
+							}
+						},
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 201 Created\", function () {",
+									"    pm.response.to.have.status(201);",
+									"});",
+									"",
+									"pm.test(\"Response body indicates successful registration\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData.message).to.eql(\"Registered\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Registers a new user account with an email and password (minimum 8 characters, maximum 72 characters)."
+					},
+					"response": []
+				},
+				{
+					"name": "1.2 Login (Captures Access Token & Sets Refresh Cookie)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Response returns valid accessToken\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"accessToken\");",
+									"    pm.expect(jsonData.accessToken).to.be.a(\"string\").and.not.be.empty;",
+									"    ",
+									"    // Automatically save accessToken to collection variables for subsequent requests",
+									"    pm.collectionVariables.set(\"accessToken\", jsonData.accessToken);",
+									"});",
+									"",
+									"pm.test(\"Set-Cookie header includes HttpOnly refreshToken\", function () {",
+									"    const setCookie = pm.response.headers.get(\"Set-Cookie\");",
+									"    pm.expect(setCookie).to.be.a(\"string\");",
+									"    pm.expect(setCookie).to.include(\"refreshToken=\");",
+									"    pm.expect(setCookie).to.include(\"HttpOnly\");",
+									"    pm.expect(setCookie).to.include(\"Path=/api/auth\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Authenticates user credentials. Returns an access token in the JSON body and sets an HttpOnly refreshToken cookie."
+					},
+					"response": []
+				},
+				{
+					"name": "1.3 Refresh Token (Rotation)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 200 OK\", function () {",
+									"    pm.response.to.have.status(200);",
+									"});",
+									"",
+									"pm.test(\"Rotated accessToken is received and updated\", function () {",
+									"    const jsonData = pm.response.json();",
+									"    pm.expect(jsonData).to.have.property(\"accessToken\");",
+									"    pm.expect(jsonData.accessToken).to.be.a(\"string\").and.not.be.empty;",
+									"    ",
+									"    // Update accessToken collection variable",
+									"    pm.collectionVariables.set(\"accessToken\", jsonData.accessToken);",
+									"});",
+									"",
+									"pm.test(\"Rotated refreshToken cookie is set\", function () {",
+									"    const setCookie = pm.response.headers.get(\"Set-Cookie\");",
+									"    pm.expect(setCookie).to.include(\"refreshToken=\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Uses the refreshToken from the HttpOnly cookie to issue a new access token and rotate the refresh token family."
+					},
+					"response": []
+				},
+				{
+					"name": "1.4 Logout",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 204 No Content\", function () {",
+									"    pm.response.to.have.status(204);",
+									"});",
+									"",
+									"pm.test(\"Response clears refreshToken cookie (Max-Age=0)\", function () {",
+									"    const setCookie = pm.response.headers.get(\"Set-Cookie\");",
+									"    pm.expect(setCookie).to.be.a(\"string\");",
+									"    pm.expect(setCookie).to.include(\"Max-Age=0\");",
+									"});",
+									"",
+									"pm.test(\"Clear accessToken variable\", function () {",
+									"    pm.collectionVariables.set(\"accessToken\", \"\");",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/logout",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"logout"
+							]
+						},
+						"description": "Revokes the active refresh token in the database and clears the client's HTTP-only refreshToken cookie."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "2. Authorization & Protected Routes",
+			"item": [
+				{
+					"name": "2.1 Protected Route - Authenticated (Valid Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Security filter allows request (Not 401 Unauthorized)\", function () {",
+									"    pm.expect(pm.response.code).to.not.equal(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/jobs/test",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"jobs",
+								"test"
+							]
+						},
+						"description": "Tests an endpoint outside /api/auth/** using the Bearer JWT access token captured during Login/Refresh. Should pass the JwtAuthFilter."
+					},
+					"response": []
+				},
+				{
+					"name": "2.2 Protected Route - Unauthenticated (Missing Token)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 401 Unauthorized\", function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/jobs/test",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"jobs",
+								"test"
+							]
+						},
+						"description": "Attempts to access a protected route without an Authorization Bearer header. Should trigger Spring Security's AuthenticationEntryPoint returning 401."
+					},
+					"response": []
+				},
+				{
+					"name": "2.3 Admin Route - Forbidden (Standard User)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 403 Forbidden\", function () {",
+									"    pm.response.to.have.status(403);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{accessToken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/admin/metrics",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"admin",
+								"metrics"
+							]
+						},
+						"description": "Tests /api/admin/** endpoint with a regular user access token (hasRole('ADMIN') rule in SecurityConfig). Should return 403 Forbidden."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "3. Negative & Edge Cases",
+			"item": [
+				{
+					"name": "3.1 Register - Duplicate Email (409 Conflict)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 409 Conflict\", function () {",
+									"    pm.response.to.have.status(409);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Attempts to register an already registered email. Expects 409 Conflict."
+					},
+					"response": []
+				},
+				{
+					"name": "3.2 Register - Validation Error (Short Password)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 400 Bad Request\", function () {",
+									"    pm.response.to.have.status(400);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"invalid_pass@example.com\",\n    \"password\": \"123\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/register",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"register"
+							]
+						},
+						"description": "Tests validation constraint @Size(min = 8, max = 72) on password."
+					},
+					"response": []
+				},
+				{
+					"name": "3.3 Login - Invalid Password (401 Unauthorized)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 401 Unauthorized\", function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"WrongPassword!\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						},
+						"description": "Attempts login with wrong credentials. Should respond with 401 Unauthorized."
+					},
+					"response": []
+				},
+				{
+					"name": "3.4 Refresh - Without Cookie (401 Unauthorized)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"pm.test(\"Status code is 401 Unauthorized\", function () {",
+									"    pm.response.to.have.status(401);",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/refresh",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"refresh"
+							]
+						},
+						"description": "Calls /api/auth/refresh without providing a valid refreshToken cookie (clear cookie jar before calling this to test)."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "testEmail",
+			"value": "developer@example.com",
+			"type": "string"
+		},
+		{
+			"key": "testPassword",
+			"value": "Password123!",
+			"type": "string"
+		},
+		{
+			"key": "accessToken",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

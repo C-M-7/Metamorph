@@ -1,4 +1,19 @@
 services:
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: metamorph-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      VITE_API_URL: http://app:8081
+    depends_on:
+      - app
+    networks:
+      - metamorph-network
+
   app:
     build:
       context: .
@@ -20,6 +35,10 @@ services:
       JWT_REFRESH_EXPIRY_MS: ${JWT_REFRESH_EXPIRY_MS:-604800000}
       CLIENT_URL: ${CLIENT_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
     depends_on:
       mysql:
         condition: service_healthy
@@ -38,6 +57,10 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-metamorph_db}
       MYSQL_USER: ${MYSQL_USER:-metamorph_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-metamorph_password}
+      AWS_REGION: ${AWS_REGION:-ap-southeast-2}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
     depends_on:
       mysql:
         condition: service_healthy
