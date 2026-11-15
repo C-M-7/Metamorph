@@ -45,9 +45,10 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
             // Use stateless session management so no HTTP session is stored on the server
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            // Define route access permissions: public auth routes, admin-only routes, and authenticated remainder
+            // Define route access permissions: public auth routes, guest-accessible file services, admin routes, and authenticated remainder
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/file/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             // Return 401 Unauthorized status on authentication failures

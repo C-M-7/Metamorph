@@ -23,11 +23,11 @@ interface AuthModalProps {
   onSuccess: (user: LoggedInUser) => void
 }
 
-// Helper to decode JWT payload safely in the browser to extract email
-function extractEmailFromJwt(token: string): string | null {
+// Helper to decode JWT payload safely in the browser to extract email and role
+function extractClaimsFromJwt(token: string): { email: string | null; role: string | null } {
   try {
     const base64Url = token.split(".")[1]
-    if (!base64Url) return null
+    if (!base64Url) return { email: null, role: null }
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
     const jsonPayload = decodeURIComponent(
       atob(base64)
@@ -36,9 +36,12 @@ function extractEmailFromJwt(token: string): string | null {
         .join("")
     )
     const payload = JSON.parse(jsonPayload)
-    return payload.email || null
+    return {
+      email: payload.email || null,
+      role: payload.role || null,
+    }
   } catch {
-    return null
+    return { email: null, role: null }
   }
 }
 
@@ -107,14 +110,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
       if (response.ok) {
         const data = await response.json()
-        const emailFromToken = data.accessToken
-          ? extractEmailFromJwt(data.accessToken)
-          : null
+        const { email: emailFromToken, role: roleFromToken } = data.accessToken
+          ? extractClaimsFromJwt(data.accessToken)
+          : { email: null, role: null }
         const finalEmail = emailFromToken || trimmedEmail
+        const finalRole = roleFromToken || "USER"
 
         localStorage.setItem("metamorph_email", finalEmail)
+        localStorage.setItem("metamorph_role", finalRole)
         onSuccess({
           email: finalEmail,
+          role: finalRole,
           accessToken: data.accessToken,
         })
         onClose()

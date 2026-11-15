@@ -24,7 +24,9 @@ public class AwsS3Service {
         this.presigner = presigner;
     }
 
+    // Generates a temporary pre-signed URL for direct file upload to S3 (valid for 5 minutes)
     public Map<String, String> createUploadUrl(String fileName, String contentType){
+        // Sanitize file name and generate a unique temporary S3 key
         String safeName = fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
         String key = "temporary/" + UUID.randomUUID() + "-" + safeName;
 
@@ -43,6 +45,7 @@ public class AwsS3Service {
         return Map.of("url", url, "key", key);
     }
 
+    // Generates a temporary pre-signed URL to download a file from S3 (valid for 5 minutes)
     public String createDownloadUrl(String key){
         GetObjectRequest getRequest = GetObjectRequest.builder()
             .bucket(bucket)

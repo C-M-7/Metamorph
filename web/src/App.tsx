@@ -8,11 +8,13 @@ import {
   LogIn,
   UserPlus,
   Shield,
+  ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sidebar } from "@/components/Sidebar"
 import { AuthModal } from "@/components/AuthModal"
 import { MetamorphStudio } from "@/components/MetamorphStudio"
+import { AdminPanel } from "@/components/AdminPanel"
 import { LoggedInUser, TransformationItem } from "@/types"
 
 // Initial sample saved transformations unlocked for logged-in accounts
@@ -69,11 +71,11 @@ const INITIAL_SAVED_TRANSFORMATIONS: TransformationItem[] = [
   },
 ]
 
-// Helper to decode JWT payload safely in the browser to extract email
-function extractEmailFromJwt(token: string): string | null {
+// Helper to decode JWT payload safely in the browser to extract email and role
+function extractClaimsFromJwt(token: string): { email: string | null; role: string | null } {
   try {
     const base64Url = token.split(".")[1]
-    if (!base64Url) return null
+    if (!base64Url) return { email: null, role: null }
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/")
     const jsonPayload = decodeURIComponent(
       atob(base64)
@@ -82,9 +84,12 @@ function extractEmailFromJwt(token: string): string | null {
         .join("")
     )
     const payload = JSON.parse(jsonPayload)
-    return payload.email || null
+    return {
+      email: payload.email || null,
+      role: payload.role || null,
+    }
   } catch {
-    return null
+    return { email: null, role: null }
   }
 }
 
@@ -92,11 +97,14 @@ export const App: React.FC = () => {
   const [user, setUser] = useState<LoggedInUser | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true)
 
+  // Current View: "studio" (File Converter) or "admin" (Admin Console)
+  const [currentView, setCurrentView] = useState<"studio" | "admin">("studio")
+
   // Navigation & User Nudge Dropdown state
   const [isNudgeOpen, setIsNudgeOpen] = useState<boolean>(false)
   const nudgeRef = useRef<HTMLDivElement>(null)
 
-  // Left Sidebar state
+  // Left Sidebar state (Studio view)
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true)
 
   // Auth Modal state
@@ -119,14 +127,18 @@ export const App: React.FC = () => {
 
         if (response.ok) {
           const data = await response.json()
-          const emailFromToken = data.accessToken
-            ? extractEmailFromJwt(data.accessToken)
-            : null
+          const { email: emailFromToken, role: roleFromToken } = data.accessToken
+            ? extractClaimsFromJwt(data.accessToken)
+            : { email: null, role: null }
+
           const resolvedEmail =
             emailFromToken || localStorage.getItem("metamorph_email") || "user@metamorph.io"
+          const resolvedRole =
+            roleFromToken || localStorage.getItem("metamorph_role") || "USER"
 
           setUser({
             email: resolvedEmail,
+            role: resolvedRole,
             accessToken: data.accessToken,
           })
         } else {
@@ -175,7 +187,9 @@ export const App: React.FC = () => {
       // Ignore network errors on logout
     }
     localStorage.removeItem("metamorph_email")
+    localStorage.removeItem("metamorph_role")
     setUser(null)
+    setCurrentView("studio")
     setIsNudgeOpen(false)
   }
 
@@ -201,17 +215,23 @@ export const App: React.FC = () => {
         <div className="mx-auto flex h-16 w-full items-center justify-between px-4 sm:px-6">
           {/* Left: Sidebar toggle + Metamorph Logo & Title */}
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen((prev) => !prev)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground"
-              title="Toggle Saved Transformations Sidebar"
-              aria-label="Toggle Sidebar"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+            {currentView === "studio" && (
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen((prev) => !prev)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-border text-muted-foreground transition hover:bg-accent hover:text-foreground"
+                title="Toggle Saved Transformations Sidebar"
+                aria-label="Toggle Sidebar"
+              >
+                <Menu className="h-5 w-5" />
+              </button>
+            )}
 
-            <div className="flex items-center gap-2.5 cursor-pointer">
+            <div
+              className="flex items-center gap-2.5 cursor-pointer"
+              onClick={() => setCurrentView("studio")}
+              title="Return to Studio"
+            >
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm shadow-primary/25">
                 <Sparkles className="h-5 w-5" />
               </div>
@@ -220,7 +240,7 @@ export const App: React.FC = () => {
                   Metamorph
                 </span>
                 <span className="hidden sm:inline-block rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
-                  Studio
+                  {currentView === "admin" ? "Admin" : "Studio"}
                 </span>
               </div>
             </div>
@@ -266,6 +286,11 @@ export const App: React.FC = () => {
                   <span className="text-sm font-medium text-foreground tracking-tight max-w-[140px] sm:max-w-[200px] truncate">
                     {user.email}
                   </span>
+                  {user.role === "ADMIN" && (
+                    <span className="hidden sm:inline-flex rounded-full bg-primary/15 text-primary text-[10px] font-bold px-1.5 py-0.5 border border-primary/25">
+                      ADMIN
+                    </span>
+                  )}
                   <ChevronDown
                     className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
                       isNudgeOpen ? "rotate-180 text-foreground" : ""
@@ -277,14 +302,43 @@ export const App: React.FC = () => {
                 {isNudgeOpen && (
                   <div className="absolute right-0 mt-2 w-64 rounded-xl border border-border bg-card p-2 shadow-xl animate-in fade-in-50 zoom-in-95 z-50">
                     <div className="px-3 py-2.5 border-b border-border/60">
-                      <div className="flex items-center gap-1.5 text-xs text-primary font-medium mb-1">
-                        <Shield className="h-3.5 w-3.5" />
-                        <span>Signed in</span>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-1.5 text-xs text-primary font-medium">
+                          <Shield className="h-3.5 w-3.5" />
+                          <span>Signed in</span>
+                        </div>
+                        {user.role === "ADMIN" && (
+                          <span className="rounded bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary uppercase">
+                            Admin
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs font-semibold text-foreground truncate" title={user.email}>
                         {user.email}
                       </p>
                     </div>
+
+                    {/* Admin Option: Visible ONLY to Admins */}
+                    {user.role === "ADMIN" && (
+                      <div className="py-1 border-b border-border/60">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setCurrentView("admin")
+                            setIsNudgeOpen(false)
+                          }}
+                          className={`w-full justify-start gap-2.5 text-xs font-semibold rounded-lg ${
+                            currentView === "admin"
+                              ? "bg-primary/15 text-primary"
+                              : "text-foreground hover:bg-accent hover:text-primary"
+                          }`}
+                        >
+                          <ShieldAlert className="h-4 w-4 text-primary" />
+                          <span>Admin Portal</span>
+                        </Button>
+                      </div>
+                    )}
 
                     <div className="pt-2">
                       <Button
@@ -306,27 +360,37 @@ export const App: React.FC = () => {
       </header>
 
       {/* ───────────────────────────────────────────────────────── */}
-      {/* Main Workspace Layout: Sidebar + Metamorph Studio Screen */}
+      {/* Main Content: Admin Console vs Studio View */}
       {/* ───────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden relative">
-        {/* Left Sidebar: Past Saved Transformations (Locked for Guests, Unlocked for Logged-In) */}
-        <Sidebar
-          isLoggedIn={!!user}
-          transformations={savedTransformations}
-          isOpen={isSidebarOpen}
-          onToggle={() => setIsSidebarOpen((prev) => !prev)}
-          onOpenAuth={handleOpenAuth}
+      {currentView === "admin" && user?.role === "ADMIN" ? (
+        <AdminPanel
+          user={user}
+          onBackToStudio={() => setCurrentView("studio")}
+          onUpdateAccessToken={(newToken) => {
+            setUser((prev) => (prev ? { ...prev, accessToken: newToken } : prev))
+          }}
         />
-
-        {/* Main Center Area: Metamorph Transformation Screen */}
-        <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-gradient-to-b from-background via-background to-secondary/15">
-          <MetamorphStudio
+      ) : (
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* Left Sidebar: Past Saved Transformations */}
+          <Sidebar
             isLoggedIn={!!user}
-            onAddTransformation={handleAddTransformation}
+            transformations={savedTransformations}
+            isOpen={isSidebarOpen}
+            onToggle={() => setIsSidebarOpen((prev) => !prev)}
             onOpenAuth={handleOpenAuth}
           />
-        </main>
-      </div>
+
+          {/* Main Center Area: Metamorph Transformation Screen */}
+          <main className="flex-1 flex flex-col min-w-0 overflow-y-auto bg-gradient-to-b from-background via-background to-secondary/15">
+            <MetamorphStudio
+              isLoggedIn={!!user}
+              onAddTransformation={handleAddTransformation}
+              onOpenAuth={handleOpenAuth}
+            />
+          </main>
+        </div>
+      )}
 
       {/* ───────────────────────────────────────────────────────── */}
       {/* Authentication Modal (Sign In / Sign Up) */}
