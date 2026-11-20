@@ -81,4 +81,12 @@ public class AdminController {
         adminService.deleteConfiguration(id);
         return ResponseEntity.noContent().build();
     }
+
+    // GET /api/admin/tables?page=0&size=15 - Retrieves paginated list of all database table names
+    @GetMapping("/tables")
+    public ResponseEntity<Page<String>> getDatabaseTables(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size) {
+        return ResponseEntity.ok(adminService.getDatabaseTables(page, size));
+    }
 }

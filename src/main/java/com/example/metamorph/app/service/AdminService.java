@@ -1,6 +1,17 @@
 package com.example.metamorph.app.service;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.sql.DataSource;
+
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -26,6 +37,7 @@ public class AdminService {
     private final UserRepository userRepository;
     private final AppConfigurationRepository appConfigurationRepository;
     private final ObjectMapper objectMapper;
+    private final DataSource dataSource;
 
     // Retrieves latest users sorted by id descending with pagination
     public Page<UserResponse> getUsers(int page, int size) {
@@ -106,6 +118,46 @@ public class AdminService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Configuration not found for id: " + id));
         entity.setDisabled(true);
         appConfigurationRepository.save(entity);
+    }
+
+    // Retrieves paginated list of database table names
+    public Page<String> getDatabaseTables(int page, int size) {
+        String sql = """
+            SELECT TABLE_NAME 
+            FROM information_schema.TABLES 
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+            ORDER BY TABLE_NAME
+        """;
+
+        List<String> allTables = new ArrayList<>();
+
+        try (Connection conn = dataSource.getConnection()) {
+            try (PreparedStatement stmt = conn.prepareStatement(sql);
+                 ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    allTables.add(rs.getString("TABLE_NAME"));
+                }
+            }
+
+            if (allTables.isEmpty()) {
+                DatabaseMetaData meta = conn.getMetaData();
+                try (ResultSet tablesRs = meta.getTables(conn.getCatalog(), conn.getSchema(), "%", new String[]{"TABLE"})) {
+                    while (tablesRs.next()) {
+                        allTables.add(tablesRs.getString("TABLE_NAME"));
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to retrieve database tables: " + e.getMessage(), e);
+        }
+
+        int pageSize = size > 0 ? size : 15;
+        int pageIndex = Math.max(page, 0);
+        int start = Math.min(pageIndex * pageSize, allTables.size());
+        int end = Math.min(start + pageSize, allTables.size());
+        List<String> subList = allTables.subList(start, end);
+
+        return new PageImpl<>(subList, PageRequest.of(pageIndex, pageSize), allTables.size());
     }
 
     private AppConfigurationResponse toResponse(AppConfiguration entity) {
